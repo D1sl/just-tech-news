@@ -1,17 +1,18 @@
 const router = require('express').Router();
-const { Post, User, Vote, Comment } = require('../../models');
 const sequelize = require('../../config/connection');
+const { Post, User, Comment, Vote } = require('../../models');
 
 // get all users
 router.get('/', (req, res) => {
+  console.log('======================');
   Post.findAll({
     attributes: [
-      'id', 
-      'post_url', 
-      'title', 
+      'id',
+      'post_url',
+      'title',
       'created_at',
-    [sequelize.literal('(SELECT COUNT(*) FROM vote WHERE post.id = vote.post_id)'), 'vote_count']],
-    order: [['created_at', 'DESC']],
+      [sequelize.literal('(SELECT COUNT(*) FROM vote WHERE post.id = vote.post_id)'), 'vote_count']
+    ],
     include: [
       {
         model: Comment,
@@ -39,8 +40,9 @@ router.get('/:id', (req, res) => {
     where: {
       id: req.params.id
     },
-    attributes: ['id',
-     'post_url',
+    attributes: [
+      'id',
+      'post_url',
       'title',
       'created_at',
       [sequelize.literal('(SELECT COUNT(*) FROM vote WHERE post.id = vote.post_id)'), 'vote_count']
@@ -75,37 +77,31 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   // expects {title: 'Taskmaster goes public!', post_url: 'https://taskmaster.com/press', user_id: 1}
-  Post.create({
-    title: req.body.title,
-    post_url: req.body.post_url,
-    user_id: req.body.user_id
-  })
-    .then(dbPostData => res.json(dbPostData))
-    .catch(err => {
-      console.log(err);
-      res.status(500).json(err);
-    });
+  if (req.session) {
+    Post.create({
+      title: req.body.title,
+      post_url: req.body.post_url,
+      user_id: req.session.user_id
+    })
+      .then(dbPostData => res.json(dbPostData))
+      .catch(err => {
+        console.log(err);
+        res.status(500).json(err);
+      });
+  }
 });
 
-// PUT api/posts/upvote -- upvote a post (this route must be above the update route, otherwise express.js will treat upvote as an id)
 router.put('/upvote', (req, res) => {
-  // make sure that a session exists, i.e. that a user is logged in
+  // custom static method created in models/Post.js
   if (req.session) {
-    // pass the session user id along with the req.body properties (destructured) to the model method created in Post.js for upvotes
     Post.upvote({ ...req.body, user_id: req.session.user_id }, { Vote, Comment, User })
-    // return the data (lines changed)
-    .then(updatedVoteData => res.json(updatedVoteData))
-    // or an error if one occurs
-    .catch(err => {
-      console.log(err);
-      res.status(500).json(err);
-    });
+      .then(updatedVoteData => res.json(updatedVoteData))
+      .catch(err => {
+        console.log(err);
+        res.status(500).json(err);
+      });
   }
-  // if a user is not logged in, send a bad request error
-  else {
-    res.status(400)
-  }
-}); 
+});
 
 router.put('/:id', (req, res) => {
   Post.update(
@@ -132,6 +128,7 @@ router.put('/:id', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
+  console.log('id', req.params.id);
   Post.destroy({
     where: {
       id: req.params.id
