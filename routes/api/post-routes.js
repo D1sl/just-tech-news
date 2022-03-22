@@ -73,33 +73,13 @@ router.post('/', (req, res) => {
 
 // PUT api/posts/upvote -- upvote a post (this route must be above the update route, otherwise express.js will treat upvote as an id)
 router.put('/upvote', (req, res) => {
-  // create an upvote with the user id of the voter and the post id of the upvoted post
-  Vote.create({
-      user_id: req.body.user_id,
-      post_id: req.body.post_id
-  })
-  // find the post just voted on and return the updated data for the post, including updated vote count
-  .then( () => {
-      return Post.findOne({
-          where: {
-              id: req.body.post_id
-          },
-          attributes: [
-              'id',
-              'post_url',
-              'title',
-              'created_at',
-              // use a raw MySQL query to get the vote count, because votes are in a separate table, so findAndCountAll() will not work
-              [
-                  sequelize.literal('(SELECT COUNT(*) FROM vote WHERE post.id = vote.post_id)'),
-                  'vote_count'
-              ]
-          ]
-      })
-  })
-  // return the data, or an error if one occurs
-  .then(dbPostData => res.json(dbPostData))
-  .catch(err => res.json(err))
+  // Custom static method created in models/Post.js
+  Post.upvote(req.body, { Vote })
+    .then(updatedPostData => res.json(updatedPostData))
+    .catch(err => {
+      console.log(err);
+      res.status(400).json(err);
+    });
 });
 
 router.put('/:id', (req, res) => {
